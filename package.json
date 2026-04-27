@@ -1,0 +1,17 @@
+{
+  "name": "communityos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CommunityOS — AI-powered NGO coordination platform",
+  "scripts": {
+    "build:functions": "npm run build --prefix functions",
+    "build:frontend": "npm run build --prefix frontend",
+    "build": "npm run build:functions && npm run build:frontend",
+    "test:functions": "npm test --prefix functions",
+    "test:frontend": "npm test --prefix frontend",
+    "test": "npm run test:functions && npm run test:frontend",
+    "lint:functions": "npm run lint --prefix functions",
+    "lint:frontend": "npm run lint --prefix frontend",
+    "lint": "npm run lint:functions && npm run lint:frontend"
+  }
+}

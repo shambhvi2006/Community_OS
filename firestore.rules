@@ -1,0 +1,134 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserNgoId() {
+      return request.auth.token.ngo_id;
+    }
+
+    function getUserRole() {
+      return request.auth.token.role;
+    }
+
+    function isTenantMatch() {
+      return resource.data.ngo_id == getUserNgoId();
+    }
+
+    function isTenantMatchOnCreate() {
+      return request.resource.data.ngo_id == getUserNgoId();
+    }
+
+    function isSuperAdmin() {
+      return getUserRole() == 'super_admin';
+    }
+
+    // --- NGOs ---
+    match /ngos/{ngoId} {
+      allow read: if isAuthenticated() && (isTenantMatch() || isSuperAdmin());
+      allow write: if isAuthenticated() &&
+                      getUserRole() in ['ngo_admin', 'super_admin'] &&
+                      (isTenantMatch() || isSuperAdmin());
+    }
+
+    // --- Needs ---
+    match /needs/{needId} {
+      allow read: if isAuthenticated() && (isTenantMatch() || isSuperAdmin());
+      allow create: if isAuthenticated() && isTenantMatchOnCreate();
+      allow update: if isAuthenticated() && isTenantMatch() &&
+                       getUserRole() in ['coordinator', 'ngo_admin', 'super_admin'];
+
+      // Audit entries: append-only, no update or delete
+      match /audit_entries/{entryId} {
+        allow read: if isAuthenticated() &&
+                       get(/databases/$(database)/documents/needs/$(needId)).data.ngo_id == getUserNgoId();
+        allow create: if isAuthenticated();
+        allow update, delete: if false;
+      }
+    }
+
+    // --- Volunteers ---
+    match /volunteers/{volunteerId} {
+      allow read: if isAuthenticated() && (isTenantMatch() || isSuperAdmin());
+      allow write: if isAuthenticated() && isTenantMatch() &&
+                      getUserRole() in ['coordinator', 'ngo_admin', 'super_admin'];
+    }
+
+    // --- Dispatches ---
+    match /dispatches/{dispatchId} {
+      allow read: if isAuthenticated() && (isTenantMatch() || isSuperAdmin());
+      allow create: if isAuthenticated() && isTenantMatchOnCreate() &&
+                       getUserRole() in ['coordinator', 'ngo_admin', 'super_admin'];
+      allow update: if isAuthenticated() && isTenantMatch();
+    }
+
+    // --- Inventory ---
+    match /inventory/{itemId} {
+      allow read: if isAuthenticated() && isTenantMatch();
+      allow write: if isAuthenticated() && isTenantMatch() &&
+                      getUserRole() in ['coordinator', 'ngo_admin', 'super_admin'];
+    }
+
+    // --- Forecasts (read-only, Cloud Functions write) ---
+    match /forecasts/{forecastId} {
+      allow read: if isAuthenticated() && isTenantMatch();
+      allow write: if false;
+    }
+
+    // --- Zones ---
+    match /zones/{zoneId} {
+      allow read: if isAuthenticated() && isTenantMatch();
+      allow write: if isAuthenticated() && isTenantMatch() &&
+                      getUserRole() in ['ngo_admin', 'super_admin'];
+    }
+
+    // --- Debriefs (read-only, Cloud Functions write) ---
+    match /debriefs/{debriefId} {
+      allow read: if isAuthenticated() && isTenantMatch();
+      allow write: if false;
+    }
+
+    // --- Consents (read-only, Cloud Functions write) ---
+    match /consents/{consentId} {
+      allow read: if isAuthenticated() && isTenantMatch();
+      allow write: if false;
+    }
+
+    // --- System Alerts (read-only, Cloud Functions write) ---
+    match /system_alerts/{alertId} {
+      allow read: if isAuthenticated() && isTenantMatch();
+      allow write: if false;
+    }
+
+    // --- Posts ---
+    match /posts/{postId} {
+      allow read: if isAuthenticated() && isTenantMatch();
+      allow write: if isAuthenticated() && isTenantMatch() &&
+                      getUserRole() in ['coordinator', 'ngo_admin', 'super_admin'];
+    }
+
+    // --- Conversations (Cloud Functions only) ---
+    match /conversations/{phone} {
+      allow read, write: if false;
+    }
+
+    // --- Message Queue (Cloud Functions only) ---
+    match /message_queue/{messageId} {
+      allow read, write: if false;
+    }
+
+    // --- Users ---
+    match /users/{uid} {
+      allow read: if isAuthenticated() &&
+                     (request.auth.uid == uid ||
+                      (getUserRole() in ['ngo_admin', 'super_admin'] &&
+                       (resource.data.ngo_id == getUserNgoId() || isSuperAdmin())));
+      allow write: if isAuthenticated() &&
+                      (request.auth.uid == uid ||
+                       getUserRole() in ['ngo_admin', 'super_admin']);
+    }
+  }
+}
