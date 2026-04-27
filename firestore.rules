@@ -66,9 +66,9 @@ service cloud.firestore {
 
     // --- Inventory ---
     match /inventory/{itemId} {
-      allow read: if isAuthenticated() && isTenantMatch();
-      allow write: if isAuthenticated() && isTenantMatch() &&
-                      getUserRole() in ['coordinator', 'ngo_admin', 'super_admin'];
+      allow read: if isAuthenticated() && (isTenantMatch() || isSuperAdmin());
+      allow create: if isAuthenticated() && isTenantMatchOnCreate();
+      allow update, delete: if isAuthenticated() && (isTenantMatch() || isSuperAdmin());
     }
 
     // --- Forecasts (read-only, Cloud Functions write) ---

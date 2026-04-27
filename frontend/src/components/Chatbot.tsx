@@ -177,6 +177,59 @@ export default function Chatbot() {
     setMessages(prev => [...prev, { id: String(Date.now()), role: 'bot', text }]);
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !ngoId) return;
+    setLoading(true);
+    addBotMsg('Processing image... extracting inventory items from handwriting.');
+
+    try {
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.readAsDataURL(file);
+      });
+
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [
+              { text: 'Extract all inventory items from this handwritten list. Return ONLY a JSON array: [{"resource_type":"item_name_snake_case","quantity":number}]. Common types: food_kits, medical_supplies, blankets, water_bottles, rice_bags, dal_packets, medicines, first_aid_kits, hygiene_kits, tents, clothing_packs.' },
+              { inlineData: { mimeType: file.type, data: base64 } }
+            ]}]
+          }),
+        }
+      );
+      const data = await res.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) throw new Error('Could not read the image');
+
+      const items = JSON.parse(jsonMatch[0]);
+      let count = 0;
+      for (const item of items) {
+        if (item.resource_type && item.quantity) {
+          await addDoc(collection(db, 'inventory'), {
+            resource_type: item.resource_type, quantity: Number(item.quantity) || 0,
+            location: { lat: 0, lng: 0, description: 'Uploaded via chatbot' },
+            ngo_id: ngoId, status: 'available',
+            created_at: serverTimestamp(), updated_at: serverTimestamp(),
+          });
+          count++;
+        }
+      }
+      addBotMsg(`Extracted ${count} items from the image and added to inventory:\n${items.map((i: any) => `- ${i.resource_type.replace(/_/g, ' ')}: ${i.quantity}`).join('\n')}`);
+    } catch (err: any) {
+      addBotMsg(`Failed to process image: ${err.message}`);
+    }
+    setLoading(false);
+    e.target.value = '';
+  };
+
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || loading || saving) return;
@@ -277,9 +330,13 @@ export default function Chatbot() {
           </div>
           <div className="border-t border-gray-200 p-3">
             <div className="flex gap-2">
+              <label className="flex items-center justify-center rounded-lg border border-gray-300 px-2 py-2 cursor-pointer hover:bg-gray-50 text-gray-500">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={loading || saving} />
+              </label>
               <input type="text" value={input} onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                placeholder={pendingNeed || pendingVolunteer ? 'Type "yes" to confirm...' : 'Describe a need or say "register volunteer"...'}
+                placeholder={pendingNeed || pendingVolunteer ? 'Type "yes" to confirm...' : 'Need / volunteer / upload inventory image...'}
                 disabled={loading || saving}
                 className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50" />
               <button onClick={sendMessage} disabled={loading || saving || !input.trim()}
