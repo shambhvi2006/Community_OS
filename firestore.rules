@@ -53,16 +53,15 @@ service cloud.firestore {
     // --- Volunteers ---
     match /volunteers/{volunteerId} {
       allow read: if isAuthenticated() && (isTenantMatch() || isSuperAdmin());
-      allow write: if isAuthenticated() && isTenantMatch() &&
-                      getUserRole() in ['coordinator', 'ngo_admin', 'super_admin'];
+      allow create: if isAuthenticated() && isTenantMatchOnCreate();
+      allow update: if isAuthenticated() && (isTenantMatch() || isSuperAdmin());
     }
 
     // --- Dispatches ---
     match /dispatches/{dispatchId} {
       allow read: if isAuthenticated() && (isTenantMatch() || isSuperAdmin());
-      allow create: if isAuthenticated() && isTenantMatchOnCreate() &&
-                       getUserRole() in ['coordinator', 'ngo_admin', 'super_admin'];
-      allow update: if isAuthenticated() && isTenantMatch();
+      allow create: if isAuthenticated() && isTenantMatchOnCreate();
+      allow update: if isAuthenticated() && (isTenantMatch() || isSuperAdmin());
     }
 
     // --- Inventory ---

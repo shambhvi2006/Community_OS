@@ -10,6 +10,9 @@ functions/lib/
 .env.local
 .env.*.local
 
+# Service account keys
+*-firebase-adminsdk-*.json
+
 # OS files
 .DS_Store
 Thumbs.db

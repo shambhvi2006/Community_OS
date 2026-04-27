@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import Chatbot from "./Chatbot";
 
 const navItems = [
   { to: "/", label: "Dashboard" },
@@ -9,6 +10,7 @@ const navItems = [
   { to: "/inventory", label: "Inventory" },
   { to: "/forecasts", label: "Forecasts" },
   { to: "/overflow", label: "Overflow" },
+  { to: "/volunteers", label: "Volunteers" },
   { to: "/blog", label: "Blog" },
   { to: "/admin", label: "Admin" },
 ];
@@ -125,6 +127,9 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Chatbot */}
+      <Chatbot />
     </div>
   );
 }
